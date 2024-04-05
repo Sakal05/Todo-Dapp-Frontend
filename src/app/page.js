@@ -3,7 +3,7 @@
 import { ethers } from "ethers";
 import ToDoContractABI from "../contract/ToDoContractABI.json";
 import { useState, useEffect } from "react";
-// import BigNumber from "bignumber.js";
+import React from 'react';
 
 export default function Home() {
   const [newTaskName, setNewTaskName] = useState("");
@@ -15,28 +15,23 @@ export default function Home() {
   const [connected, setConnected] = useState(false);
   const [sharedTasks, setSharedTasks] = useState([]);
   const [taskCreatorAddress, setTaskCreatorAddress] = useState("");
+  const [sharedTasksMap, setSharedTasksMap] = useState({});
 
   let signer = null;
 
   let provider;
   const { ethereum } = window;
-  
+
   if (!ethereum) {
     provider = ethers.getDefaultProvider();
   } else {
     provider = new ethers.providers.Web3Provider(window.ethereum);
     signer = provider.getSigner();
-    // ethereum
-    //   .enable()
-    //   .then((provider = new ethers.providers.Web3Provider(ethereum)));
-    // await provider.send("eth_requestAccounts", []);
-    // provider = new ethers.providers.Web3Provider(window.ethereum);
-    // signer = provider.getSigner();
   }
 
   const initContract = () => {
     const todoContract = new ethers.Contract(
-      "0x794Bd9510A8C987946077089C04EF56b954cb098",
+      "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
       ToDoContractABI,
       provider
     ).connect(signer);
@@ -48,7 +43,7 @@ export default function Home() {
     if (!connected) {
       try {
         provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
+        // await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
         setConnected(true);
         getUserAddress();
@@ -92,7 +87,9 @@ export default function Home() {
       let contract = initContract();
       const tasks = await contract.getSharedTasks(taskCreatorAddress);
       console.log(tasks);
-      setSharedTasks(tasks);
+      const updatedSharedTasksMap = { ...sharedTasksMap }; // Create a copy of the current state
+      updatedSharedTasksMap[taskCreatorAddress] = tasks; // Add or update shared tasks for the creator address
+      setSharedTasksMap(updatedSharedTasksMap); // Update state
     } catch (error) {
       console.error(error);
     }
@@ -114,7 +111,7 @@ export default function Home() {
       console.log(tasks);
       setNewTaskName("");
       setShareAddresses([]);
-      setShowCreateTaskModal(false)
+      setShowCreateTaskModal(false);
     } catch (error) {
       console.error(error);
     }
@@ -138,31 +135,32 @@ export default function Home() {
         id
       );
       console.log(markTaskDone);
-      // await contract.on("TaskCompleted", () => {
-      //   getSharedTasks();
-      // });
     } catch (error) {
       console.error(error);
     }
   };
 
   useEffect(() => {
-    if (signer !== null) {
-      getUserAddress();
-      getWalletBalance();
-      getMyTasks();
-      setConnected(true);
-    } else {
+    if (signer === null) {
       connectWallet();
     }
-  }, [signer]);
+    getUserAddress();
+    getWalletBalance();
+    getMyTasks();
+    setConnected(true);
+  }, []);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-8">
       <nav className="flex justify-between w-full mb-8">
         <div>My Address: {address}</div>
         <div>Balance: {balance}</div>
-        <button className="btn" >
+        <button
+          className="btn"
+          onClick={() => {
+            connectWallet();
+          }}
+        >
           {connected ? "Connected" : "Connect Wallet"}
         </button>
       </nav>
@@ -215,7 +213,10 @@ export default function Home() {
         </button>
       </div>
       {showCreateTaskModal && (
-        <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75">
+        <div
+          className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75"
+          style={{ zIndex: "9999" }}
+        >
           <div className="bg-white p-8 rounded-md">
             <h2 className="text-lg font-semibold mb-2">Create New Task</h2>
             <div className="flex flex-col">
@@ -268,53 +269,65 @@ export default function Home() {
             placeholder="Task Creator's Address"
             value={taskCreatorAddress}
             onChange={(e) => setTaskCreatorAddress(e.target.value)}
-            className="input mb-2"
+            className="input mb-2 w-full"
           />
-          <button className="btn" onClick={getSharedTasks}>
+          <button
+            className="btn"
+            onClick={() => {
+              getSharedTasks();
+            }}
+          >
             Get Shared Tasks
           </button>
         </div>
-        <table className="table-auto w-full mt-4">
-          <thead>
-            <tr>
+        <div className="w-full">
+          <table className="table-auto w-full mt-4">
+            <thead>
               <tr>
                 <th className="px-4 py-2">ID</th>
                 <th className="px-4 py-2">Task Name</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Actions</th>
               </tr>
-            </tr>
-          </thead>
-          <tbody>
-            {sharedTasks.map((task, index) => (
-              <tr key={index}>
-                <td className="border px-4 py-2">{index}</td>
-                <td className="border px-4 py-2">{task.taskName}</td>
-                <td className="border px-4 py-2">
-                  {task.completed ? "Completed" : "Not Yet"}
-                </td>
-                <td className="border px-4 py-2">
-                  {!task.completed ? (
-                    <button
-                      className="btn"
-                      onClick={() => {
-                        markSharedTaskAsDone(
-                          ethers.BigNumber.from(task.id).toNumber()
-                        );
-                      }}
-                    >
-                      Mark As Complete
-                    </button>
-                  ) : (
-                    <button className="btn" disabled>
-                      Completed
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Object.entries(sharedTasksMap).map(([creatorAddress, tasks]) => (
+                <React.Fragment key={creatorAddress}>
+                  {/* Row indicating the creator's address */}
+                  <tr>
+                    <td colSpan="4" className="border px-4 py-2 font-bold">
+                      Creator Address: {creatorAddress}
+                    </td>
+                  </tr>
+                  {/* Render individual shared tasks */}
+                  {tasks.map((task, index) => (
+                    <tr key={index}>
+                      <td className="border px-4 py-2">{ethers.BigNumber.from(task.id).toNumber()}</td>
+                      <td className="border px-4 py-2">{task.taskName}</td>
+                      <td className="border px-4 py-2">
+                        {task.completed ? "Completed" : "Not Yet"}
+                      </td>
+                      <td className="border px-4 py-2">
+                        {!task.completed ? (
+                          <button
+                            className="btn"
+                            onClick={() => markSharedTaskAsDone(ethers.BigNumber.from(task.id).toNumber())}
+                          >
+                            Mark As Complete
+                          </button>
+                        ) : (
+                          <button className="btn" disabled>
+                            Completed
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </main>
   );
