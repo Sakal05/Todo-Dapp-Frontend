@@ -28,10 +28,7 @@ export default function Home() {
   // Define a function to fetch the balance of the signer's wallet address
   const getWalletBalance = async () => {
     try {
-      const { signer } = connectContract(
-        "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
-        ToDoContractABI
-      );
+      const { signer } = connectContract(ADDRESS, ToDoContractABI);
       const balance = await signer.getBalance();
       updateBalance(ethers.utils.formatEther(balance).toString());
     } catch (error) {
