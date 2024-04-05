@@ -16,8 +16,9 @@ export default function Home() {
   const [sharedTasks, setSharedTasks] = useState([]);
   const [taskCreatorAddress, setTaskCreatorAddress] = useState("");
   const [sharedTasksMap, setSharedTasksMap] = useState({});
+  const [signers, setSigner] = useState(null);
 
-  let signer = null;
+  // let signer = null;
 
   let provider;
 
@@ -26,7 +27,8 @@ export default function Home() {
       "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
       ToDoContractABI,
       provider
-    ).connect(signer);
+    ).connect(signers);
+
     return todoContract;
   };
 
@@ -36,7 +38,8 @@ export default function Home() {
       try {
         provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
+        const signer = provider.getSigner();
+        setSigner(signer)
         setConnected(true);
         getUserAddress();
         getWalletBalance();
@@ -48,7 +51,7 @@ export default function Home() {
   }
 
   async function getUserAddress() {
-    const address = await signer.getAddress();
+    const address = await signers.getAddress();
     updateAddress(address);
     return address;
   }
@@ -56,7 +59,7 @@ export default function Home() {
   // Define a function to fetch the balance of the signer's wallet address
   const getWalletBalance = async () => {
     try {
-      const balance = await signer.getBalance();
+      const balance = await signers.getBalance();
       updateBalance(ethers.utils.formatEther(balance).toString());
     } catch (error) {
       console.error(error);
@@ -65,7 +68,12 @@ export default function Home() {
 
   const getMyTasks = async () => {
     try {
-      const contract = initContract();
+      // const contract = new ethers.Contract(
+      //   "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
+      //   ToDoContractABI,
+      //   provider
+      // ).connect(signer);
+      let contract = initContract();
       const tasks = await contract.getMyTasks();
       console.log(tasks);
       setTasks(tasks);
@@ -88,10 +96,16 @@ export default function Home() {
   };
 
   const onCreateNewTask = async () => {
-    if (signer === null) {
+    if (signers === null) {
       console.log("no signer");
       connectWallet();
+      // signer = provider.getSigner();
     }
+    // const contract = new ethers.Contract(
+      //   "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
+      //   ToDoContractABI,
+    //   provider
+    // ).connect(signers);
     try {
       let contract = initContract();
       console.log(shareAddresses);
@@ -132,24 +146,29 @@ export default function Home() {
     }
   };
 
+  // useEffect(() => {
+  //   setContract(initContract());
+  // }, [signer]);
+
   useEffect(() => {
     const { ethereum } = window;
 
     if (!ethereum) {
       provider = ethers.getDefaultProvider();
     } else {
-      // provider = new ethers.providers.Web3Provider(window.ethereum);
-      // signer = provider.getSigner();
-      connectWallet();
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      setSigner(signer);
     }
-    if (signer === null) {
-      connectWallet();
-    }
+    connectWallet();
+    // if (signer === null) {
+    //   connectWallet();
+    // }
     getUserAddress();
     getWalletBalance();
     getMyTasks();
     setConnected(true);
-  }, []);
+  }, [signers]);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-8">
