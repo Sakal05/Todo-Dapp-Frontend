@@ -35,7 +35,7 @@ export default function Home() {
     if (!connected) {
       try {
         provider = new ethers.providers.Web3Provider(window.ethereum);
-        // await provider.send("eth_requestAccounts", []);
+        await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
         setConnected(true);
         getUserAddress();
@@ -138,8 +138,9 @@ export default function Home() {
     if (!ethereum) {
       provider = ethers.getDefaultProvider();
     } else {
-      provider = new ethers.providers.Web3Provider(window.ethereum);
-      signer = provider.getSigner();
+      // provider = new ethers.providers.Web3Provider(window.ethereum);
+      // signer = provider.getSigner();
+      connectWallet();
     }
     if (signer === null) {
       connectWallet();
