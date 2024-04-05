@@ -3,6 +3,8 @@
 import { ethers } from "ethers";
 import ToDoContractABI from "../contract/ToDoContractABI.json";
 import { useState, useEffect } from "react";
+import connectContract from "./utils/connectContract";
+import ADDRESS from "../contract/ContractAddress";
 import React from "react";
 
 export default function Home() {
@@ -13,45 +15,12 @@ export default function Home() {
   const [balance, updateBalance] = useState("");
   const [tasks, setTasks] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [sharedTasks, setSharedTasks] = useState([]);
   const [taskCreatorAddress, setTaskCreatorAddress] = useState("");
   const [sharedTasksMap, setSharedTasksMap] = useState({});
-  const [signers, setSigner] = useState(null);
-
-  // let signer = null;
-
-  let provider;
-
-  const initContract = () => {
-    const todoContract = new ethers.Contract(
-      "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
-      ToDoContractABI,
-      provider
-    ).connect(signers);
-
-    return todoContract;
-  };
-
-  async function connectWallet() {
-    console.log("Wallet connect status: ", connected);
-    if (!connected) {
-      try {
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        const signer = provider.getSigner();
-        setSigner(signer)
-        setConnected(true);
-        getUserAddress();
-        getWalletBalance();
-        getMyTasks();
-      } catch (error) {
-        console.error(error);
-      }
-    }
-  }
 
   async function getUserAddress() {
-    const address = await signers.getAddress();
+    const { signer } = connectContract(ADDRESS, ToDoContractABI);
+    const address = await signer.getAddress();
     updateAddress(address);
     return address;
   }
@@ -59,7 +28,11 @@ export default function Home() {
   // Define a function to fetch the balance of the signer's wallet address
   const getWalletBalance = async () => {
     try {
-      const balance = await signers.getBalance();
+      const { signer } = connectContract(
+        "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
+        ToDoContractABI
+      );
+      const balance = await signer.getBalance();
       updateBalance(ethers.utils.formatEther(balance).toString());
     } catch (error) {
       console.error(error);
@@ -68,13 +41,8 @@ export default function Home() {
 
   const getMyTasks = async () => {
     try {
-      // const contract = new ethers.Contract(
-      //   "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
-      //   ToDoContractABI,
-      //   provider
-      // ).connect(signer);
-      let contract = initContract();
-      const tasks = await contract.getMyTasks();
+      const { Contract } = connectContract(ADDRESS, ToDoContractABI);
+      const tasks = await Contract.getMyTasks();
       console.log(tasks);
       setTasks(tasks);
     } catch (error) {
@@ -84,8 +52,8 @@ export default function Home() {
 
   const getSharedTasks = async () => {
     try {
-      let contract = initContract();
-      const tasks = await contract.getSharedTasks(taskCreatorAddress);
+      const { Contract } = connectContract(ADDRESS, ToDoContractABI);
+      const tasks = await Contract.getSharedTasks(taskCreatorAddress);
       console.log(tasks);
       const updatedSharedTasksMap = { ...sharedTasksMap }; // Create a copy of the current state
       updatedSharedTasksMap[taskCreatorAddress] = tasks; // Add or update shared tasks for the creator address
@@ -96,24 +64,14 @@ export default function Home() {
   };
 
   const onCreateNewTask = async () => {
-    if (signers === null) {
-      console.log("no signer");
-      connectWallet();
-      // signer = provider.getSigner();
-    }
-    // const contract = new ethers.Contract(
-      //   "0x15138a8Ab6B71AbC786F3EDae0B46a93F0Bd7B7f",
-      //   ToDoContractABI,
-    //   provider
-    // ).connect(signers);
     try {
-      let contract = initContract();
+      const { Contract } = connectContract(ADDRESS, ToDoContractABI);
       console.log(shareAddresses);
       let addresses = shareAddresses;
       if (addresses.length == 0) {
         addresses = [];
       }
-      const tasks = await contract.createTask(newTaskName, addresses);
+      const tasks = await Contract.createTask(newTaskName, addresses);
       console.log(tasks);
       setNewTaskName("");
       setShareAddresses([]);
@@ -125,8 +83,8 @@ export default function Home() {
 
   const markOwnTaskAsDone = async (id) => {
     try {
-      let contract = initContract();
-      const markTaskDone = await contract.markAsCompleted(address, id);
+      const { Contract } = connectContract(ADDRESS, ToDoContractABI);
+      const markTaskDone = await Contract.markAsCompleted(address, id);
       console.log(markTaskDone);
     } catch (error) {
       console.error(error);
@@ -135,8 +93,8 @@ export default function Home() {
 
   const markSharedTaskAsDone = async (id) => {
     try {
-      let contract = initContract();
-      const markTaskDone = await contract.markAsCompleted(
+      const { Contract } = connectContract(ADDRESS, ToDoContractABI);
+      const markTaskDone = await Contract.markAsCompleted(
         taskCreatorAddress,
         id
       );
@@ -146,29 +104,12 @@ export default function Home() {
     }
   };
 
-  // useEffect(() => {
-  //   setContract(initContract());
-  // }, [signer]);
-
   useEffect(() => {
-    const { ethereum } = window;
-
-    if (!ethereum) {
-      provider = ethers.getDefaultProvider();
-    } else {
-      provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      setSigner(signer);
-    }
-    connectWallet();
-    // if (signer === null) {
-    //   connectWallet();
-    // }
     getUserAddress();
     getWalletBalance();
     getMyTasks();
     setConnected(true);
-  }, [signers]);
+  }, []);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-8">
@@ -178,7 +119,11 @@ export default function Home() {
         <button
           className="btn"
           onClick={() => {
-            connectWallet();
+            connectContract(ADDRESS, ToDoContractABI);
+            getUserAddress();
+            getWalletBalance();
+            getMyTasks();
+            setConnected(true);
           }}
         >
           {connected ? "Connected" : "Connect Wallet"}
