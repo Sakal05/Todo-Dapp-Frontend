@@ -3,7 +3,7 @@
 import { ethers } from "ethers";
 import ToDoContractABI from "../contract/ToDoContractABI.json";
 import { useState, useEffect } from "react";
-import React from 'react';
+import React from "react";
 
 export default function Home() {
   const [newTaskName, setNewTaskName] = useState("");
@@ -20,14 +20,6 @@ export default function Home() {
   let signer = null;
 
   let provider;
-  const { ethereum } = window;
-
-  if (!ethereum) {
-    provider = ethers.getDefaultProvider();
-  } else {
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    signer = provider.getSigner();
-  }
 
   const initContract = () => {
     const todoContract = new ethers.Contract(
@@ -141,6 +133,14 @@ export default function Home() {
   };
 
   useEffect(() => {
+    const { ethereum } = window;
+
+    if (!ethereum) {
+      provider = ethers.getDefaultProvider();
+    } else {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+    }
     if (signer === null) {
       connectWallet();
     }
@@ -302,7 +302,9 @@ export default function Home() {
                   {/* Render individual shared tasks */}
                   {tasks.map((task, index) => (
                     <tr key={index}>
-                      <td className="border px-4 py-2">{ethers.BigNumber.from(task.id).toNumber()}</td>
+                      <td className="border px-4 py-2">
+                        {ethers.BigNumber.from(task.id).toNumber()}
+                      </td>
                       <td className="border px-4 py-2">{task.taskName}</td>
                       <td className="border px-4 py-2">
                         {task.completed ? "Completed" : "Not Yet"}
@@ -311,7 +313,11 @@ export default function Home() {
                         {!task.completed ? (
                           <button
                             className="btn"
-                            onClick={() => markSharedTaskAsDone(ethers.BigNumber.from(task.id).toNumber())}
+                            onClick={() =>
+                              markSharedTaskAsDone(
+                                ethers.BigNumber.from(task.id).toNumber()
+                              )
+                            }
                           >
                             Mark As Complete
                           </button>
