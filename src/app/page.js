@@ -19,14 +19,19 @@ export default function Home() {
   let signer = null;
 
   let provider;
-
-  if (window.ethereum == undefined) {
-    console.log("MetaMask not installed; using read-only defaults");
+  const { ethereum } = window;
+  
+  if (!ethereum) {
     provider = ethers.getDefaultProvider();
   } else {
-    window.ethereum.enable().then(provider = new ethers.providers.Web3Provider(window.ethereum));
-    // provider = new ethers.providers.Web3Provider(window.ethereum);
+    provider = new ethers.providers.Web3Provider(window.ethereum);
     signer = provider.getSigner();
+    // ethereum
+    //   .enable()
+    //   .then((provider = new ethers.providers.Web3Provider(ethereum)));
+    // await provider.send("eth_requestAccounts", []);
+    // provider = new ethers.providers.Web3Provider(window.ethereum);
+    // signer = provider.getSigner();
   }
 
   const initContract = () => {
@@ -41,20 +46,17 @@ export default function Home() {
   async function connectWallet() {
     console.log("Wallet connect status: ", connected);
     if (!connected) {
-      if (window.ethereum == null) {
-        console.log("MetaMask not installed; using read-only defaults");
-        provider = ethers.getDefaultProvider();
-      } else {
-        provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         signer = provider.getSigner();
+        setConnected(true);
+        getUserAddress();
+        getWalletBalance();
+        getMyTasks();
+      } catch (error) {
+        console.error(error);
       }
-      console.log("here connecting");
-
-      setConnected(true);
-      getUserAddress();
-      getWalletBalance();
-      getMyTasks();
     }
   }
 
@@ -73,6 +75,7 @@ export default function Home() {
       console.error(error);
     }
   };
+
   const getMyTasks = async () => {
     try {
       const contract = initContract();
@@ -96,15 +99,22 @@ export default function Home() {
   };
 
   const onCreateNewTask = async () => {
+    if (signer === null) {
+      console.log("no signer");
+      connectWallet();
+    }
     try {
       let contract = initContract();
-      console.log(shareAddresses)
-      // console.log(contract);
-      // const taskName = "Bors Teas"; // Set your task name here
-      // const sharedWith = ["0x5852231D8a00306A67DfB128AEd50c1573411d60"]; // Set addresses to share the task with here
-      // contract.connect(signer);
-      const tasks = await contract.createTask(newTaskName, shareAddresses);
+      console.log(shareAddresses);
+      let addresses = shareAddresses;
+      if (addresses.length == 0) {
+        addresses = [];
+      }
+      const tasks = await contract.createTask(newTaskName, addresses);
       console.log(tasks);
+      setNewTaskName("");
+      setShareAddresses([]);
+      setShowCreateTaskModal(false)
     } catch (error) {
       console.error(error);
     }
@@ -128,29 +138,31 @@ export default function Home() {
         id
       );
       console.log(markTaskDone);
+      // await contract.on("TaskCompleted", () => {
+      //   getSharedTasks();
+      // });
     } catch (error) {
       console.error(error);
     }
   };
 
   useEffect(() => {
-    if (signer) {
+    if (signer !== null) {
       getUserAddress();
       getWalletBalance();
       getMyTasks();
-      setConnected(true)
+      setConnected(true);
     } else {
-      connectWallet()
-      setConnected(true)
+      connectWallet();
     }
-  }, []);
+  }, [signer]);
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-8">
       <nav className="flex justify-between w-full mb-8">
         <div>My Address: {address}</div>
         <div>Balance: {balance}</div>
-        <button className="btn" onClick={connectWallet}>
+        <button className="btn" >
           {connected ? "Connected" : "Connect Wallet"}
         </button>
       </nav>
@@ -167,7 +179,9 @@ export default function Home() {
           <tbody>
             {tasks.map((task, index) => (
               <tr key={index}>
-                <td className="border px-4 py-2">{ethers.BigNumber.from(task.id).toNumber()}</td>
+                <td className="border px-4 py-2">
+                  {ethers.BigNumber.from(task.id).toNumber()}
+                </td>
                 <td className="border px-4 py-2">{task.taskName}</td>
                 <td className="border px-4 py-2">
                   {task.completed ? "Completed" : "Not Yet"}
@@ -177,7 +191,9 @@ export default function Home() {
                     <button
                       className="btn"
                       onClick={() => {
-                        markOwnTaskAsDone(ethers.BigNumber.from(task.id).toNumber());
+                        markOwnTaskAsDone(
+                          ethers.BigNumber.from(task.id).toNumber()
+                        );
                       }}
                     >
                       Mark As Complete
@@ -202,14 +218,16 @@ export default function Home() {
         <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75">
           <div className="bg-white p-8 rounded-md">
             <h2 className="text-lg font-semibold mb-2">Create New Task</h2>
-            <form onSubmit={onCreateNewTask} className="flex flex-col">
+            <div className="flex flex-col">
+              <h3 className="mb-2 p-5">Task Name </h3>
               <input
                 type="text"
                 placeholder="Task Name"
                 value={newTaskName}
                 onChange={(e) => setNewTaskName(e.target.value)}
-                className="input mb-2"
+                className="input mb-2 p-5"
               />
+              <h3 className="mb-2 p-5">Share Address (Optional) </h3>
               <input
                 type="text"
                 placeholder="List of Share Addresses (comma separated)"
@@ -219,7 +237,7 @@ export default function Home() {
                     e.target.value.split(",").map((address) => address.trim())
                   )
                 }
-                className="input mb-2"
+                className="input mb-2 p-5"
               />
               <div className="flex justify-end">
                 <button
@@ -229,11 +247,16 @@ export default function Home() {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    onCreateNewTask();
+                  }}
+                >
                   Create Task
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -275,7 +298,9 @@ export default function Home() {
                     <button
                       className="btn"
                       onClick={() => {
-                        markSharedTaskAsDone(ethers.BigNumber.from(task.id).toNumber());
+                        markSharedTaskAsDone(
+                          ethers.BigNumber.from(task.id).toNumber()
+                        );
                       }}
                     >
                       Mark As Complete
